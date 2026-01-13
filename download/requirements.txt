@@ -1,0 +1,10 @@
+Flask==2.3.2
+Flask-SocketIO==5.3.6
+playwright==1.39.0
+playwright-stealth==1.0.6
+requests==2.31.0
+Werkzeug==2.3.4
+python-socketio==5.10.0
+python-engineio==4.8.0
+bidict==0.22.1
+python-dotenv==1.0.0

@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verdinha Dashboard</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 30px;
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            color: #4ade80;
+            margin-bottom: 10px;
+        }
+        
+        header p {
+            color: #94a3b8;
+        }
+        
+        .version-badge {
+            display: inline-block;
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            margin-top: 10px;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .card h2 {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            color: #4ade80;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            font-size: 1rem;
+            transition: border-color 0.3s, opacity 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #4ade80;
+        }
+        
+        .form-group input::placeholder {
+            color: #64748b;
+        }
+        
+        .form-group input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: #4ade80;
+            color: #000;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: #22c55e;
+            transform: translateY(-2px);
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: #fff;
+        }
+        
+        .btn-danger:hover:not(:disabled) {
+            background: #dc2626;
+        }
+        
+        .btn-warning {
+            background: #f59e0b;
+            color: #000;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        /* Spinner */
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Status */
+        .status-card {
+            grid-column: span 2;
+        }
+        
+        @media (max-width: 768px) {
+            .status-card {
+                grid-column: span 1;
+            }
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .status-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        .status-item {
+            background: rgba(0,0,0,0.3);
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .status-item .value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #4ade80;
+        }
+        
+        .status-item .label {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+        
+        /* Progress bar */
+        .progress-container {
+            margin: 20px 0;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ade80, #22c55e);
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+        
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #94a3b8;
+        }
+        
+        /* Logs */
+        .logs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .logs-header h2 {
+            margin-bottom: 0;
+        }
+        
+        .logs-count {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+        
+        .logs-container {
+            background: rgba(0,0,0,0.4);
+            border-radius: 8px;
+            padding: 16px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+        }
+        
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .log-entry .time {
+            color: #64748b;
+            margin-right: 10px;
+        }
+        
+        .log-entry.info .message {
+            color: #94a3b8;
+        }
+        
+        .log-entry.warning .message {
+            color: #f59e0b;
+        }
+        
+        .log-entry.error .message {
+            color: #ef4444;
+        }
+        
+        .log-entry.success .message {
+            color: #4ade80;
+        }
+        
+        /* Status indicator */
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .status-indicator.running {
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
+        
+        .status-indicator.starting {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+        
+        .status-indicator.stopping {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        
+        .status-indicator.completed {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+        
+        .status-indicator.error {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        
+        .status-indicator.idle {
+            background: rgba(148, 163, 184, 0.2);
+            color: #94a3b8;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        
+        .status-indicator.running .status-dot,
+        .status-indicator.starting .status-dot {
+            animation: pulse 1.5s infinite;
+        }
+        
+        .status-indicator.running .status-dot {
+            background: #4ade80;
+        }
+        
+        .status-indicator.starting .status-dot {
+            background: #f59e0b;
+        }
+        
+        .status-indicator.stopping .status-dot {
+            background: #ef4444;
+        }
+        
+        .status-indicator.completed .status-dot {
+            background: #22c55e;
+        }
+        
+        .status-indicator.error .status-dot {
+            background: #ef4444;
+        }
+        
+        .status-indicator.idle .status-dot {
+            background: #94a3b8;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Config */
+        .config-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .config-section h3 {
+            font-size: 1rem;
+            color: #94a3b8;
+            margin-bottom: 16px;
+        }
+        
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 16px 24px;
+            border-radius: 8px;
+            background: #4ade80;
+            color: #000;
+            font-weight: 600;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .toast.error {
+            background: #ef4444;
+            color: #fff;
+        }
+        
+        .toast.warning {
+            background: #f59e0b;
+            color: #000;
+        }
+        
+        /* Info box */
+        .info-box {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            font-size: 0.85rem;
+            color: #93c5fd;
+        }
+        
+        .info-box strong {
+            color: #60a5fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌿 Verdinha Dashboard</h1>
+            <p>Gerenciador de downloads de mangás e manhwas</p>
+            <span class="version-badge">v2.0 - Robusto</span>
+        </header>
+        
+        <div class="grid">
+            <!-- Formulário de Download -->
+            <div class="card">
+                <h2>📥 Novo Download</h2>
+                
+                <div class="info-box">
+                    <strong>Dica:</strong> Se você já baixou parte de uma obra, o bot continuará automaticamente de onde parou!
+                </div>
+                
+                <div class="form-group">
+                    <label for="url">URL do Primeiro Capítulo</label>
+                    <input type="text" id="url" placeholder="https://verdinha.wtf/capitulo/12345">
+                </div>
+                
+                <div class="form-group">
+                    <label for="nome">Nome da Pasta</label>
+                    <input type="text" id="nome" placeholder="Ex: Solo Leveling">
+                </div>
+                
+                
+
+<div class="form-group">
+    <label for="expected_total">Total de Capítulos (opcional)</label>
+    <input type="number" id="expected_total" placeholder="Ex: 304" min="0">
+</div>
+
+<div class="form-group">
+    <label for="batch_size">Limite por Rodada (batch)</label>
+    <input type="number" id="batch_size" placeholder="Ex: 50" min="0" value="50">
+</div>
+
+<div class="btn-group" style="flex-direction: column; gap: 12px;">
+    <button class="btn btn-primary" id="btnImportar" onclick="importarCatalogo()" style="background: #3b82f6; color: white; width: 100%; justify-content: center; font-size: 1.1rem; padding: 16px;">
+        <span>🚀 Importar Tudo do Catálogo</span>
+    </button>
+    
+    <div style="display: flex; gap: 10px; width: 100%;">
+        <button class="btn btn-primary" id="btnIniciar" onclick="iniciarDownload()" style="flex: 1; justify-content: center;">
+            <span id="btnIniciarText">Iniciar Manual</span>
+        </button>
+        <button class="btn btn-danger" id="btnParar" onclick="pararDownload()" style="display: none; flex: 1; justify-content: center;">
+            <span id="btnPararText">Parar</span>
+        </button>
+    </div>
+</div>
+
+                <!-- Configurações removidas da interface (usar .env) -->
+            </div>
+            
+            <!-- Status Atual -->
+            <div class="card">
+                <h2>📊 Status Atual</h2>
+                
+                <div style="margin-bottom: 20px;">
+                    <span class="status-indicator idle" id="statusIndicator">
+                        <span class="status-dot"></span>
+                        <span id="statusText">Aguardando</span>
+                    </span>
+                </div>
+                
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="value" id="capituloAtual">0</div>
+                        <div class="label">Capítulo</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="value" id="totalImagens">0</div>
+                        <div class="label">Imagens</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="value" id="filaSize">0</div>
+                        <div class="label">Na Fila</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="value" id="progressoAtual">0%</div>
+                        <div class="label">Progresso</div>
+                    </div>
+                </div>
+                
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressBar" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-text">
+                        <span id="obraAtual">-</span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Logs -->
+            <div class="card status-card">
+                <div class="logs-header">
+                    <h2>📝 Logs</h2>
+                    <span class="logs-count" id="logsCount">0 entradas</span>
+                </div>
+                <div class="logs-container" id="logsContainer">
+                    <div class="log-entry info">
+                        <span class="time">--:--:--</span>
+                        <span class="message">Aguardando início...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+    
+    <script>
+        // Configurações
+        const MAX_LOGS = 300;
+        
+        // Conectar ao WebSocket
+        const socket = io();
+        
+        // Elementos
+        const logsContainer = document.getElementById('logsContainer');
+        const logsCount = document.getElementById('logsCount');
+        const btnIniciar = document.getElementById('btnIniciar');
+        const btnIniciarText = document.getElementById('btnIniciarText');
+        const btnParar = document.getElementById('btnParar');
+        const btnPararText = document.getElementById('btnPararText');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const urlInput = document.getElementById('url');
+        const nomeInput = document.getElementById('nome');
+        const expectedTotalInput = document.getElementById('expected_total');
+        const batchSizeInput = document.getElementById('batch_size');
+        
+        // Estado atual
+        let currentState = 'idle';
+        let logCount = 0;
+        
+        // Mapeamento de estados para texto
+        const stateLabels = {
+            'idle': 'Aguardando',
+            'starting': 'Iniciando...',
+            'running': 'Baixando...',
+            'stopping': 'Parando...',
+            'completed': 'Concluído',
+            'error': 'Erro'
+        };
+        
+        // WebSocket events
+        socket.on('connect', () => {
+            console.log('Conectado ao servidor');
+            showToast('Conectado!', 'success');
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('Desconectado do servidor');
+            showToast('Desconectado!', 'error');
+        });
+        
+        socket.on('status', (data) => {
+            updateStatus(data);
+        });
+        
+        socket.on('log', (data) => {
+            addLog(data);
+        });
+        
+        socket.on('logs', (logs) => {
+            logsContainer.innerHTML = '';
+            logCount = 0;
+            logs.forEach(log => addLog(log));
+        });
+        
+        // Funções
+        function updateStatus(data) {
+            const state = data.state || (data.running ? 'running' : 'idle');
+            currentState = state;
+            
+            // Atualizar indicador de status
+            statusIndicator.className = `status-indicator ${state}`;
+            statusText.textContent = stateLabels[state] || state;
+            
+            // Controlar visibilidade e estado dos botões
+            const isActive = ['starting', 'running', 'stopping'].includes(state);
+            const isStopping = state === 'stopping';
+            
+            // Botão Iniciar
+            btnIniciar.disabled = isActive;
+            btnIniciar.style.display = isActive ? 'none' : 'inline-flex';
+            
+            // Botão Parar
+            btnParar.style.display = isActive ? 'inline-flex' : 'none';
+            btnParar.disabled = isStopping;
+            
+            if (isStopping) {
+                btnPararText.textContent = 'Parando...';
+            } else {
+                btnPararText.textContent = 'Parar';
+            }
+            
+            // Desabilitar inputs durante execução
+            urlInput.disabled = isActive;
+            nomeInput.disabled = isActive;
+            
+            // Atualizar valores
+            document.getElementById('capituloAtual').textContent = data.chapter || 0;
+            document.getElementById('totalImagens').textContent = data.total_images || 0;
+            document.getElementById('progressoAtual').textContent = (data.progress || 0) + '%';
+            
+            // Atualizar barra de progresso
+            document.getElementById('progressBar').style.width = (data.progress || 0) + '%';
+            document.getElementById('progressPercent').textContent = (data.progress || 0) + '%';
+            
+            // Atualizar obra atual
+            if (data.current_job) {
+                document.getElementById('obraAtual').textContent = data.current_job.nome;
+            } else {
+                document.getElementById('obraAtual').textContent = '-';
+            }
+        }
+        
+        function addLog(log) {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${log.level}`;
+            entry.innerHTML = `
+                <span class="time">${log.timestamp}</span>
+                <span class="message">${escapeHtml(log.message)}</span>
+            `;
+            logsContainer.appendChild(entry);
+            
+            // Limitar número de logs no DOM
+            logCount++;
+            while (logsContainer.children.length > MAX_LOGS) {
+                logsContainer.removeChild(logsContainer.firstChild);
+            }
+            
+            // Atualizar contador
+            logsCount.textContent = `${Math.min(logCount, MAX_LOGS)} entradas`;
+            
+            // Auto-scroll
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        async function importarCatalogo() {
+            if (!confirm('Deseja importar todas as obras do catalogo.json para a fila de download?')) return;
+            
+            const btn = document.getElementById('btnImportar');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Importando...';
+            
+            try {
+                const response = await fetch('/api/import_catalogo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showToast(`Sucesso! ${data.imported} obras adicionadas à fila.`);
+                } else {
+                    showToast(data.error || 'Erro ao importar catálogo', 'error');
+                }
+            } catch (err) {
+                showToast('Erro de conexão', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        async function iniciarDownload() {
+            const url = urlInput.value.trim();
+            const nome = nomeInput.value.trim();
+            
+            if (!url) {
+                showToast('Por favor, insira a URL do capítulo', 'error');
+                return;
+            }
+            
+            // Desabilitar botão imediatamente
+            btnIniciar.disabled = true;
+            btnIniciarText.textContent = 'Iniciando...';
+            
+            try {
+                const response = await fetch('/api/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, nome, expected_total: parseInt(expectedTotalInput?.value || '0', 10) || 0, batch_size: parseInt(batchSizeInput?.value || '50', 10) || 50 })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('Download iniciado!', 'success');
+                    urlInput.value = '';
+                    nomeInput.value = '';
+                } else {
+                    showToast(data.error || 'Erro ao iniciar', 'error');
+                    btnIniciar.disabled = false;
+                    btnIniciarText.textContent = 'Iniciar Download';
+                }
+            } catch (e) {
+                showToast('Erro de conexão', 'error');
+                btnIniciar.disabled = false;
+                btnIniciarText.textContent = 'Iniciar Download';
+            }
+        }
+        
+        async function pararDownload() {
+            // Desabilitar botão imediatamente
+            btnParar.disabled = true;
+            btnPararText.textContent = 'Parando...';
+            
+            try {
+                await fetch('/api/stop', { method: 'POST' });
+                showToast('Solicitação de parada enviada', 'warning');
+            } catch (e) {
+                showToast('Erro ao parar', 'error');
+                btnParar.disabled = false;
+                btnPararText.textContent = 'Parar';
+            }
+        }
+        
+        async function salvarConfig() {
+            const email = document.getElementById('email').value.trim();
+            const senha = document.getElementById('senha').value;
+            
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, senha })
+                });
+                
+                if (response.ok) {
+                    showToast('Credenciais salvas!', 'success');
+                }
+            } catch (e) {
+                showToast('Erro ao salvar', 'error');
+            }
+        }
+        
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            
+            setTimeout(() => {
+                toast.className = 'toast';
+            }, 3000);
+        }
+        
+        // Carregar configurações ao iniciar
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const data = await response.json();
+                document.getElementById('email').value = data.email || '';
+            } catch (e) {
+                console.error('Erro ao carregar config:', e);
+            }
+        }
+        
+        // Atualizar status periodicamente
+        async function refreshStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                updateStatus(data.status);
+                document.getElementById('filaSize').textContent = data.queue_size || 0;
+            } catch (e) {
+                console.error('Erro ao atualizar status:', e);
+            }
+        }
+        
+        // Inicialização
+        loadConfig();
+        refreshStatus();
+        setInterval(refreshStatus, 3000);
+    </script>
+</body>
+</html>

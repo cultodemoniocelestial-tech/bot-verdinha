@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Culto Demoníaco - Uploader Dashboard</title>
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        
+        header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 30px;
+        }
+        
+        header h1 {
+            font-size: 2rem;
+            background: linear-gradient(90deg, #e94560, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        
+        header p { color: #888; font-size: 0.9rem; }
+        
+        .version-badge {
+            display: inline-block;
+            background: #e94560;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            margin-top: 10px;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        @media (max-width: 900px) {
+            .dashboard { grid-template-columns: 1fr; }
+        }
+        
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .card h2 {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-box {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .stat-box .value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #e94560;
+        }
+        
+        .stat-box .label {
+            color: #888;
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+        
+        .stat-box.highlight .value { color: #4caf50; }
+        
+        .current-obra {
+            background: rgba(233, 69, 96, 0.1);
+            border: 1px solid rgba(233, 69, 96, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .current-obra .title { font-weight: bold; color: #e94560; }
+        
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .status-indicator.running { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+        .status-indicator.idle { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+        .status-indicator.error { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #e94560, #ff6b6b);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(233, 69, 96, 0.4);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #f44336, #ff5252);
+            color: white;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .logs-card { grid-column: 1 / -1; }
+        
+        .logs-container {
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 15px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+        }
+        
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .log-entry .timestamp { color: #666; margin-right: 10px; }
+        .log-entry.error .message { color: #f44336; }
+        .log-entry.warning .message { color: #ffc107; }
+        .log-entry.success .message { color: #4caf50; }
+        .log-entry.info .message { color: #fff; }
+        
+        .logs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .logs-count { color: #666; font-size: 0.85rem; }
+        
+        .fila-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 10px;
+        }
+        
+        .fila-item {
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+        }
+        
+        .fila-item:first-child {
+            background: rgba(233, 69, 96, 0.2);
+            border: 1px solid rgba(233, 69, 96, 0.3);
+        }
+        
+        .config-info {
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.85rem;
+        }
+        
+        .config-info p { margin: 5px 0; color: #888; }
+        .config-info strong { color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>👹 Culto Demoníaco - Uploader</h1>
+            <p>Dashboard de Upload Automático - Processa fila do bot de download</p>
+            <span class="version-badge">v2.0 - Integrado</span>
+        </header>
+        
+        <div class="dashboard">
+            <!-- Controles -->
+            <div class="card">
+                <h2>🎮 Controles</h2>
+                
+                <div class="status-indicator" id="statusIndicator">
+                    <span class="status-dot"></span>
+                    <span id="statusText">Aguardando</span>
+                </div>
+                
+                <div class="current-obra" id="currentObra" style="display: none; margin-top: 15px;">
+                    <span class="title" id="obraTitle">-</span>
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-primary" id="btnIniciar" onclick="iniciarUpload()">
+                        🚀 Iniciar Monitoramento da Fila
+                    </button>
+                    <button class="btn btn-danger" id="btnParar" onclick="pararUpload()" style="display: none;">
+                        ⏹️ Parar Upload
+                    </button>
+                </div>
+                
+                <div class="config-info">
+                    <p><strong>Site:</strong> <span id="configSite">-</span></p>
+                    <p><strong>Email:</strong> <span id="configEmail">-</span></p>
+                </div>
+            </div>
+            
+            <!-- Status -->
+            <div class="card">
+                <h2>📊 Status</h2>
+                
+                <div class="stats-grid">
+                    <div class="stat-box highlight">
+                        <div class="value" id="filaPendente">0</div>
+                        <div class="label">Na Fila</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="value" id="obrasProcessadas">0</div>
+                        <div class="label">Obras Enviadas</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="value" id="capitulosEnviados">0</div>
+                        <div class="label">Capítulos</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="value" id="statusState">-</div>
+                        <div class="label">Estado</div>
+                    </div>
+                </div>
+                
+                <h3 style="margin-bottom: 10px; font-size: 0.95rem;">📋 Fila de Upload</h3>
+                <div class="fila-list" id="filaList">
+                    <div class="fila-item" style="color: #888;">Fila vazia</div>
+                </div>
+            </div>
+            
+            <!-- Capítulos Quebrados -->
+            <div class="card">
+                <div class="logs-header">
+                    <h2>⚠️ Capítulos Quebrados</h2>
+                    <span class="logs-count" id="quebradosCount">0 capítulos</span>
+                </div>
+                <p style="color: #888; font-size: 0.85rem; margin-bottom: 10px;">Capítulos com pastas vazias ou imagens quebradas</p>
+                <div class="fila-list" id="quebradosList" style="max-height: 150px;">
+                    <div class="fila-item" style="color: #888;">Nenhum capítulo quebrado</div>
+                </div>
+                <button class="btn" style="background: #ff9800; margin-top: 10px;" onclick="baixarRelatorioQuebrados()">
+                    💾 Baixar Relatório CSV
+                </button>
+            </div>
+            
+            <!-- Logs -->
+            <div class="card logs-card">
+                <div class="logs-header">
+                    <h2>📝 Logs</h2>
+                    <span class="logs-count" id="logsCount">0 entradas</span>
+                </div>
+                <div class="logs-container" id="logsContainer"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const socket = io();
+        const logsContainer = document.getElementById('logsContainer');
+        
+        socket.on('status', function(status) {
+            document.getElementById('filaPendente').textContent = status.fila_pendente || 0;
+            document.getElementById('obrasProcessadas').textContent = status.obras_processadas || 0;
+            document.getElementById('capitulosEnviados').textContent = status.capitulos_enviados || 0;
+            document.getElementById('statusState').textContent = status.state || 'idle';
+            
+            const indicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('statusText');
+            indicator.className = 'status-indicator ' + (status.running ? 'running' : 'idle');
+            statusText.textContent = status.running ? 'Monitorando Fila' : 'Parado';
+            
+            const currentObra = document.getElementById('currentObra');
+            if (status.current_obra) {
+                currentObra.style.display = 'block';
+                document.getElementById('obraTitle').textContent = status.current_obra;
+            } else {
+                currentObra.style.display = 'none';
+            }
+            
+            document.getElementById('btnIniciar').style.display = status.running ? 'none' : 'block';
+            document.getElementById('btnParar').style.display = status.running ? 'block' : 'none';
+        });
+        
+        socket.on('log', function(log) { addLog(log); });
+        socket.on('logs', function(logs) {
+            logsContainer.innerHTML = '';
+            logs.forEach(addLog);
+        });
+        
+        function addLog(log) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + (log.level || 'info');
+            entry.innerHTML = `<span class="timestamp">${log.timestamp}</span><span class="message">${escapeHtml(log.message)}</span>`;
+            logsContainer.appendChild(entry);
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+            document.getElementById('logsCount').textContent = logsContainer.children.length + ' entradas';
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        async function iniciarUpload() {
+            const btn = document.getElementById('btnIniciar');
+            btn.disabled = true;
+            try {
+                const response = await fetch('/api/start', { method: 'POST' });
+                const data = await response.json();
+                if (!data.success) alert(data.error || 'Erro ao iniciar');
+            } catch (err) {
+                alert('Erro de conexão');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+        
+        async function pararUpload() {
+            if (!confirm('Deseja parar o upload?')) return;
+            try { await fetch('/api/stop', { method: 'POST' }); } catch (err) { alert('Erro ao parar'); }
+        }
+        
+        async function loadFila() {
+            try {
+                const response = await fetch('/api/fila');
+                const fila = await response.json();
+                const filaList = document.getElementById('filaList');
+                
+                if (fila.length === 0) {
+                    filaList.innerHTML = '<div class="fila-item" style="color: #888;">Fila vazia - aguardando downloads</div>';
+                } else {
+                    filaList.innerHTML = fila.map((item, i) => 
+                        `<div class="fila-item">${i === 0 ? '▶ ' : ''}${item.obra_nome}</div>`
+                    ).join('');
+                }
+            } catch (err) {
+                console.error('Erro ao carregar fila:', err);
+            }
+        }
+        
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                document.getElementById('configSite').textContent = config.site_url || '-';
+                document.getElementById('configEmail').textContent = config.email || 'NÃO CONFIGURADO';
+            } catch (err) {
+                console.error('Erro ao carregar config:', err);
+            }
+        }
+        
+        async function loadQuebrados() {
+            try {
+                const response = await fetch('/api/quebrados');
+                const quebrados = await response.json();
+                const quebradosList = document.getElementById('quebradosList');
+                const quebradosCount = document.getElementById('quebradosCount');
+                
+                quebradosCount.textContent = quebrados.length + ' capítulos';
+                
+                if (quebrados.length === 0) {
+                    quebradosList.innerHTML = '<div class="fila-item" style="color: #888;">Nenhum capítulo quebrado</div>';
+                } else {
+                    quebradosList.innerHTML = quebrados.slice(-20).reverse().map(item => 
+                        `<div class="fila-item" style="color: #ff9800;"><strong>${item.obra}</strong> - Cap ${item.capitulo}: ${item.motivo}</div>`
+                    ).join('');
+                }
+            } catch (err) {
+                console.error('Erro ao carregar quebrados:', err);
+            }
+        }
+        
+        function baixarRelatorioQuebrados() {
+            window.location.href = '/api/quebrados/download';
+        }
+        
+        loadConfig();
+        loadFila();
+        loadQuebrados();
+        setInterval(loadFila, 5000);
+        setInterval(loadQuebrados, 10000);
+    </script>
+</body>
+</html>

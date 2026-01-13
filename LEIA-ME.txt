@@ -1,0 +1,177 @@
+===============================================
+BOTS INTEGRADOS - VERDINHA → CULTO DEMONÍACO
+===============================================
+
+VERSÃO 3.0 - DIVINE STEALTH + RELATÓRIO DE QUEBRADOS
+
+===============================================
+NOVIDADES DESTA VERSÃO
+===============================================
+
+1. DIVINE STEALTH (Bot de Download)
+   - Stealth de nível divino no login
+   - Bypass de detecção de automação
+   - Movimentos de mouse humanizados
+   - Digitação caractere por caractere
+   - Delays aleatórios naturais
+   - Spoofing de WebGL, Canvas, Audio
+   - Bypass de fingerprinting
+
+2. RELATÓRIO DE CAPÍTULOS QUEBRADOS (Bot de Upload)
+   - Detecta pastas vazias ou sem imagens
+   - Gera arquivo CSV com todos os quebrados
+   - Interface mostra quebrados em tempo real
+   - Botão para baixar relatório completo
+
+===============================================
+COMO FUNCIONA
+===============================================
+
+1. Bot de Download baixa uma obra completa
+2. Automaticamente adiciona na fila de upload
+3. Bot de Upload pega da fila e sobe pro seu site
+4. Capítulos quebrados são registrados no CSV
+5. Tudo acontece em paralelo, sem engargalar
+
+===============================================
+INICIAR OS DOIS BOTS DE UMA VEZ
+===============================================
+
+Basta rodar na pasta raiz:
+
+   ./iniciar.sh
+
+Ou no Windows/manual:
+
+   # Terminal 1 - Download
+   cd download
+   python3 app.py
+
+   # Terminal 2 - Upload  
+   cd upload
+   python3 app.py
+
+===============================================
+ACESSAR OS DASHBOARDS
+===============================================
+
+📥 Bot de Download: http://localhost:5000
+📤 Bot de Upload:   http://localhost:5001
+
+===============================================
+FLUXO DE USO
+===============================================
+
+1. Acesse http://localhost:5000 (Download)
+2. Clique em "Importar Tudo do Catálogo"
+3. O bot começa a baixar as obras com Divine Stealth
+
+4. Acesse http://localhost:5001 (Upload)
+5. Clique em "Iniciar Monitoramento da Fila"
+6. O bot vai subindo as obras conforme terminam
+7. Capítulos quebrados aparecem na seção amarela
+
+Pronto! Deixe os dois rodando e acompanhe
+pelos dashboards.
+
+===============================================
+CREDENCIAIS (JÁ CONFIGURADAS)
+===============================================
+
+download/.env:
+  VERDINHA_EMAIL=jonathan.21202120@gmail.com
+  VERDINHA_SENHA=55436231
+
+upload/.env:
+  CULTO_EMAIL=culto.demonio.celestial@gmail.com
+  CULTO_SENHA=55436231
+
+===============================================
+RELATÓRIO DE CAPÍTULOS QUEBRADOS
+===============================================
+
+O arquivo capitulos_quebrados.csv é gerado
+automaticamente na pasta raiz quando o bot
+de upload encontra:
+
+- Pastas de capítulos vazias
+- Capítulos com menos de 3 imagens
+- Imagens corrompidas ou ausentes
+
+Formato do CSV:
+  obra,capitulo,motivo,data_hora
+
+Você pode:
+- Ver na interface do upload (seção amarela)
+- Baixar o CSV pelo botão na interface
+- Acessar diretamente: /api/quebrados/download
+
+===============================================
+COMANDOS ÚTEIS
+===============================================
+
+# Parar tudo
+pkill -f app.py
+
+# Matar porta específica
+fuser -k 5000/tcp
+fuser -k 5001/tcp
+
+# Ver fila de upload
+cat fila_upload.json
+
+# Ver capítulos quebrados
+cat capitulos_quebrados.csv
+
+===============================================
+ESTRUTURA
+===============================================
+
+BOTS_INTEGRADOS/
+├── iniciar.sh              ← Script para iniciar tudo
+├── fila_upload.json        ← Fila compartilhada
+├── capitulos_quebrados.csv ← Relatório de quebrados
+├── catalogo.json           ← Catálogo das obras
+│
+├── download/               ← Bot de Download
+│   ├── app.py
+│   ├── divine_stealth.py   ← Módulo de Stealth Divino
+│   ├── .env                ← Credenciais Verdinha
+│   └── downloads/          ← Obras baixadas
+│
+└── upload/                 ← Bot de Upload
+    ├── app.py
+    └── .env                ← Credenciais Culto
+
+===============================================
+DIVINE STEALTH - TÉCNICAS IMPLEMENTADAS
+===============================================
+
+1.  WebDriver Detection Bypass
+2.  Chrome Runtime Spoofing
+3.  Plugins Spoofing
+4.  Languages Spoofing
+5.  Permissions Spoofing
+6.  WebGL Spoofing
+7.  Canvas Fingerprint Protection
+8.  Audio Fingerprint Protection
+9.  Hardware Concurrency Spoofing
+10. Device Memory Spoofing
+11. Platform Spoofing
+12. Vendor Spoofing
+13. Connection Spoofing
+14. Battery API Spoofing
+15. Screen Properties Spoofing
+16. Timezone Spoofing
+17. IFrame Detection Bypass
+18. Headless Detection Bypass
+19. Media Devices Spoofing
+20. Function toString Spoofing
+21. Console Log Spoofing
+22. Document Properties Spoofing
+
++ Movimentos de mouse com curvas de Bezier
++ Digitação humanizada com delays variáveis
++ Scrolls e pausas aleatórias
+
+===============================================
