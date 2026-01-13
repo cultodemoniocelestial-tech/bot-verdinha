@@ -478,7 +478,7 @@
 
 <div class="form-group">
     <label for="batch_size">Limite por Rodada (batch)</label>
-    <input type="number" id="batch_size" placeholder="Ex: 50" min="0" value="50">
+    <input type="number" id="batch_size" placeholder="Ex: 0 (sem limite)" min="0" value="0">
 </div>
 
 <div class="btn-group" style="flex-direction: column; gap: 12px;">
@@ -738,7 +738,7 @@
                 const response = await fetch('/api/download', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url, nome, expected_total: parseInt(expectedTotalInput?.value || '0', 10) || 0, batch_size: parseInt(batchSizeInput?.value || '50', 10) || 50 })
+                    body: JSON.stringify({ url, nome, expected_total: parseInt(expectedTotalInput?.value || '0', 10) || 0, batch_size: parseInt(batchSizeInput?.value || '0', 10) || 0 })
                 });
                 
                 const data = await response.json();

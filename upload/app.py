@@ -88,7 +88,7 @@ SITE_SENHA = ENV_VARS.get('CULTO_SENHA', '')
 
 # Caminhos
 CATALOGO_PATH = Path(ENV_VARS.get('CATALOGO_PATH', 'catalogo.json'))
-DOWNLOADS_DIR = Path(ENV_VARS.get('DOWNLOADS_DIR', '../download/downloads'))
+DOWNLOADS_DIR = Path(ENV_VARS.get('DOWNLOADS_DIR', str(Path(__file__).parent.parent / 'downloads')))
 FILA_UPLOAD_FILE = Path(__file__).parent.parent / 'fila_upload.json'
 QUEUE_STORE = QueueStore()
 CAPITULOS_QUEBRADOS_FILE = Path(__file__).parent.parent / 'capitulos_quebrados.csv'
@@ -140,6 +140,27 @@ def carregar_relatorio_quebrados():
                     'data_hora': parts[3]
                 })
     return quebrados
+
+def resolver_pasta_obra(obra_nome, pasta=None):
+    """Resolve a pasta da obra a partir do nome ou do caminho informado."""
+    candidatos = []
+    if pasta:
+        candidatos.append(Path(pasta))
+
+    def _sanitizar_nome(nome):
+        return "".join(c for c in nome if c.isalnum() or c in (' ', '-', '_')).strip().replace(' ', '_')
+
+    nome_sanitizado = _sanitizar_nome(obra_nome)
+    candidatos.extend([
+        DOWNLOADS_DIR / obra_nome,
+        DOWNLOADS_DIR / nome_sanitizado,
+        DOWNLOADS_DIR / obra_nome.replace(' ', '_'),
+    ])
+
+    for candidato in candidatos:
+        if candidato and candidato.exists():
+            return candidato
+    return None
 
 # Debug
 if SITE_EMAIL:
@@ -287,10 +308,10 @@ def upload_obra(obra_info):
     from playwright.sync_api import sync_playwright
     
     obra_nome = obra_info.get('obra_nome')
-    pasta = Path(obra_info.get('pasta'))
+    pasta = resolver_pasta_obra(obra_nome, obra_info.get('pasta'))
     
-    if not pasta.exists():
-        log_message(f"Pasta não encontrada: {pasta}", level='error')
+    if not pasta or not pasta.exists():
+        log_message(f"Pasta não encontrada para '{obra_nome}'. Verifique downloads_dir.", level='error')
         return False
     
     # Buscar informações no catálogo
@@ -339,13 +360,49 @@ def upload_obra(obra_info):
                     else:
                         raise e
             
-            page.fill("#email", email)
-            page.fill("#password", senha)
-            page.click("button:has-text('Entrar')")
-            time.sleep(3)
-            
+            def fill_first(selectors, value):
+                for selector in selectors:
+                    try:
+                        el = page.locator(selector).first
+                        if el.is_visible(timeout=2000):
+                            el.fill(value)
+                            return True
+                    except Exception:
+                        continue
+                return False
+
+            email_ok = fill_first(
+                [
+                    "#email",
+                    "input[type='email']",
+                    "input[name='email']",
+                    "input[placeholder*='email' i]",
+                ],
+                email,
+            )
+            senha_ok = fill_first(
+                [
+                    "#password",
+                    "input[type='password']",
+                    "input[name='password']",
+                    "input[placeholder*='senha' i]",
+                ],
+                senha,
+            )
+
+            if not email_ok or not senha_ok:
+                log_message("Campos de login não encontrados na página.", level='error')
+                return False
+
+            page.click("button:has-text('Entrar'), button[type='submit']")
+
+            for _ in range(10):
+                time.sleep(1)
+                if '/login' not in page.url:
+                    break
+
             if '/login' in page.url:
-                log_message("Falha no login!", level='error')
+                log_message(f"Falha no login. URL atual: {page.url}", level='error')
                 return False
             
             log_message("Login realizado!", level='success')
@@ -435,68 +492,91 @@ def upload_obra(obra_info):
                     log_message(f"Erro ao criar obra: {e}", level='error')
                     return False
             
-            # Upload de capítulos
-            cap_folders = sorted([d for d in pasta.iterdir() if d.is_dir() and d.name.startswith('cap_')])
-            
-            for cap_folder in cap_folders:
-                # Verificar se foi solicitado parar
-                with status_lock:
-                    if not bot_status['running']:
-                        log_message("Upload interrompido pelo usuário", level='warning')
+            # Upload de capítulos (com espera por capítulos novos enquanto o download não termina)
+            enviados = set()
+            idle_cycles = 0
+            max_idle_cycles = 30
+
+            while True:
+                should_stop = False
+                cap_folders = sorted([d for d in pasta.iterdir() if d.is_dir() and d.name.startswith('cap_')])
+                novos = [c for c in cap_folders if c.name not in enviados]
+
+                if not novos:
+                    summary_file = pasta / 'summary.json'
+                    if summary_file.exists():
                         break
-                
-                cap_name = cap_folder.name.replace("cap_", "").lstrip("0") or "0"
-                
-                # Verificar se capítulo já existe
-                try:
-                    if page.locator(f"tr:has-text('#{cap_name}')").is_visible(timeout=1000):
-                        continue
-                except:
-                    pass
-                
-                images = sorted([str(img) for img in cap_folder.iterdir() 
-                               if img.suffix.lower() in ['.jpg', '.jpeg', '.png', '.webp']])
-                
-                # Verificar se o capítulo está quebrado (pasta vazia ou sem imagens)
-                if not images:
-                    log_message(f"Capítulo {cap_name} QUEBRADO (pasta vazia ou sem imagens)", level='warning')
-                    registrar_capitulo_quebrado(titulo, cap_name, 'Pasta vazia ou sem imagens válidas')
+                    idle_cycles += 1
+                    if idle_cycles >= max_idle_cycles:
+                        log_message("Sem novos capítulos por muito tempo. Encerrando upload.", level='warning')
+                        break
+                    time.sleep(5)
                     continue
-                
-                # Verificar se tem poucas imagens (possível quebrado)
-                if len(images) < 3:
-                    log_message(f"Capítulo {cap_name} com poucas imagens ({len(images)}). Pode estar incompleto.", level='warning')
-                    registrar_capitulo_quebrado(titulo, cap_name, f'Apenas {len(images)} imagens - possivelmente incompleto')
-                
-                log_message(f"Enviando capítulo {cap_name} ({len(images)} imagens)...")
-                
-                try:
-                    page.click("button:has-text('Novo Capítulo')", timeout=5000)
-                    time.sleep(1)
-                    
-                    page.fill("#chapter-number", cap_name)
-                    page.fill("#chapter-title", cap_name)
-                    
-                    # Upload das imagens
-                    file_input = page.locator("input[type='file'][multiple]").first
-                    if file_input.is_visible(timeout=5000):
-                        file_input.set_input_files(images)
-                        time.sleep(2)
-                    
-                    page.click("button:has-text('Criar Capítulo')", timeout=5000)
-                    time.sleep(3)
-                    
-                    capitulos_enviados += 1
+
+                idle_cycles = 0
+                for cap_folder in novos:
+                    # Verificar se foi solicitado parar
                     with status_lock:
-                        bot_status['capitulos_enviados'] += 1
-                    update_status({'capitulos_enviados': bot_status['capitulos_enviados']})
-                    log_message(f"Capítulo {cap_name} enviado!", level='success')
-                except Exception as e:
-                    log_message(f"Erro no capítulo {cap_name}: {e}", level='error')
+                        if not bot_status['running']:
+                            log_message("Upload interrompido pelo usuário", level='warning')
+                            should_stop = True
+                            break
+                    
+                    cap_name = cap_folder.name.replace("cap_", "").lstrip("0") or "0"
+                    
+                    # Verificar se capítulo já existe
                     try:
-                        page.click("button:has-text('Cancelar')", timeout=2000)
+                        if page.locator(f"tr:has-text('#{cap_name}')").is_visible(timeout=1000):
+                            continue
                     except:
                         pass
+                    
+                    images = sorted([str(img) for img in cap_folder.iterdir() 
+                                   if img.suffix.lower() in ['.jpg', '.jpeg', '.png', '.webp']])
+                    
+                    # Verificar se o capítulo está quebrado (pasta vazia ou sem imagens)
+                    if not images:
+                        log_message(f"Capítulo {cap_name} QUEBRADO (pasta vazia ou sem imagens)", level='warning')
+                        registrar_capitulo_quebrado(titulo, cap_name, 'Pasta vazia ou sem imagens válidas')
+                        continue
+                    
+                    # Verificar se tem poucas imagens (possível quebrado)
+                    if len(images) < 3:
+                        log_message(f"Capítulo {cap_name} com poucas imagens ({len(images)}). Pode estar incompleto.", level='warning')
+                        registrar_capitulo_quebrado(titulo, cap_name, f'Apenas {len(images)} imagens - possivelmente incompleto')
+                    
+                    log_message(f"Enviando capítulo {cap_name} ({len(images)} imagens)...")
+                    
+                    try:
+                        page.click("button:has-text('Novo Capítulo')", timeout=5000)
+                        time.sleep(1)
+                        
+                        page.fill("#chapter-number", cap_name)
+                        page.fill("#chapter-title", cap_name)
+                        
+                        # Upload das imagens
+                        file_input = page.locator("input[type='file'][multiple]").first
+                        if file_input.is_visible(timeout=5000):
+                            file_input.set_input_files(images)
+                            time.sleep(2)
+                        
+                        page.click("button:has-text('Criar Capítulo')", timeout=5000)
+                        time.sleep(3)
+                        
+                        capitulos_enviados += 1
+                        with status_lock:
+                            bot_status['capitulos_enviados'] += 1
+                        update_status({'capitulos_enviados': bot_status['capitulos_enviados']})
+                        log_message(f"Capítulo {cap_name} enviado!", level='success')
+                        enviados.add(cap_folder.name)
+                    except Exception as e:
+                        log_message(f"Erro no capítulo {cap_name}: {e}", level='error')
+                        try:
+                            page.click("button:has-text('Cancelar')", timeout=2000)
+                        except:
+                            pass
+                if should_stop:
+                    break
             
             log_message(f"Upload de '{titulo}' concluído! {capitulos_enviados} capítulos enviados.", level='success')
             return True

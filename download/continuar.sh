@@ -5,12 +5,12 @@ set -euo pipefail
 #   ./continuar.sh "NOME_DA_OBRA" "URL_DO_CAPITULO" [TOTAL_CAPITULOS] [BATCH_SIZE]
 #
 # Exemplo:
-#   ./continuar.sh "Solo_Leveling" "https://.../algum-capitulo" 304 50
+#   ./continuar.sh "Solo_Leveling" "https://.../algum-capitulo" 304 0
 
 OBRA="${1:-}"
 URL="${2:-}"
 TOTAL="${3:-0}"
-BATCH="${4:-50}"
+BATCH="${4:-0}"
 HOST="${VERDINHA_HOST:-http://localhost:5000}"
 
 if [[ -z "$OBRA" || -z "$URL" ]]; then

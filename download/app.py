@@ -115,7 +115,7 @@ MIN_IMAGES_PER_CHAPTER = int(os.environ.get('VERDINHA_MIN_IMAGES_PER_CHAPTER', '
 # Capítulos com menos imagens não serão ignorados: viram 'partial' ou 'broken'.
 MIN_IMAGES_PARTIAL = int(os.environ.get('VERDINHA_MIN_IMAGES_PARTIAL', '1'))
 MIN_DIM_PX = int(os.environ.get('VERDINHA_MIN_DIM_PX', '300'))
-BATCH_SIZE_DEFAULT = int(os.environ.get('VERDINHA_BATCH_SIZE', '50'))
+BATCH_SIZE_DEFAULT = int(os.environ.get('VERDINHA_BATCH_SIZE', '0'))
 
 # IA opcional para sugerir ajustes de extração (NÃO altera navegação)
 AI_ENABLED = os.environ.get('VERDINHA_AI_ENABLED', '0') == '1'
@@ -885,6 +885,7 @@ def run_download_bot(job):
     progress_data = load_progress(obra_nome)
     ultimo_capitulo_url = progress_data.get('ultimo_capitulo_url')
     capitulos_baixados = progress_data.get('capitulos_baixados', [])
+    upload_enqueued = bool(progress_data.get('upload_enqueued'))
 
     # Memória de URLs já visitadas (evita duplicação/loop sem depender de padrão de URL)
     visited_urls = set()
@@ -1409,8 +1410,21 @@ def run_download_bot(job):
                             'capitulos_baixados': capitulos_baixados,
                             'expected_total': int(job.get('expected_total') or 0),
                             'batch_size': int(job.get('batch_size') or BATCH_SIZE_DEFAULT),
+                            'upload_enqueued': upload_enqueued,
                             'ultima_atualizacao': datetime.now().isoformat()
                         })
+
+                        if not upload_enqueued and len(capitulos_baixados) >= 1:
+                            if adicionar_fila_upload(obra_nome, job):
+                                upload_enqueued = True
+                                save_progress(obra_nome, {
+                                    'ultimo_capitulo_url': new_url,
+                                    'capitulos_baixados': capitulos_baixados,
+                                    'expected_total': int(job.get('expected_total') or 0),
+                                    'batch_size': int(job.get('batch_size') or BATCH_SIZE_DEFAULT),
+                                    'upload_enqueued': upload_enqueued,
+                                    'ultima_atualizacao': datetime.now().isoformat()
+                                })
 
                         capitulo += 1
 
